@@ -127,9 +127,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   <button class="tab" role="tab" id="tab-meta" data-tab="meta">Metas</button>
   <button class="tab" role="tab" id="tab-saldos" data-tab="saldos">Saldos</button>
 </div></nav>
-<div id="gate" class="sheet-bg" hidden style="align-items:center"><div class="sheet" style="border-radius:20px;max-width:380px;text-align:center">
-  <h3>Caixa da Laise</h3><p class="note" id="gate-msg" style="margin:0">Entre com a sua conta Google para ver suas contas.</p>
-  <button class="btn primary" id="login" style="justify-self:center;padding:12px 20px">Entrar com Google</button></div></div>
+<div id="gate" class="sheet-bg" hidden style="align-items:center"><form class="sheet" id="login-form" style="border-radius:20px;max-width:380px" onsubmit="return false">
+  <h3 style="text-align:center">Caixa da Laise</h3><p class="note" id="gate-msg" style="margin:0;text-align:center">Entre para ver suas contas.</p>
+  <label for="login-email">E-mail<input id="login-email" type="email" autocomplete="username" value="laisesilvabarros@gmail.com" required></label>
+  <label for="login-senha">Senha<input id="login-senha" type="password" autocomplete="current-password" required></label>
+  <button class="btn primary" id="login" type="submit" style="padding:12px 20px">Entrar</button></form></div>
 <div id="sheet-root"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -490,23 +492,22 @@ document.addEventListener('input', e=>{
 
 /* ---------- boot ---------- */
 render();
-const LAISE_EMAIL='laisesilvabarros@gmail.com';
+const LAISE_EMAIL='laisesilvabarros@gmail.com'; const LAISE_UID=(window.FIREBASE_CONFIG||{}).laiseUid||'';
 function start(){
   if(!window.firebase || !(window.FIREBASE_CONFIG||{}).apiKey){ setSync('falta configurar o Firebase'); return; }
   firebase.initializeApp(window.FIREBASE_CONFIG);
   const auth=firebase.auth();
-  auth.getRedirectResult().catch(e=>setSync('erro no login: '+(e.code||'')));
   auth.onAuthStateChanged(u=>{
     const gate=document.getElementById('gate');
     if(!u){ gate.hidden=false; setSync('entre para ver'); return; }
-    if((u.email||'').toLowerCase()!==LAISE_EMAIL){ gate.hidden=false; document.getElementById('gate-msg').textContent='Esta conta não tem acesso. Entre com '+LAISE_EMAIL+'.'; auth.signOut(); return; }
+    if((u.email||'').toLowerCase()!==LAISE_EMAIL || (LAISE_UID && u.uid!==LAISE_UID)){ gate.hidden=false; document.getElementById('gate-msg').textContent='Esta conta não tem acesso. Entre com '+LAISE_EMAIL+'.'; auth.signOut(); return; }
     gate.hidden=true; connect();
   });
-  document.getElementById('login').onclick=()=>{
-    const p=new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({login_hint:LAISE_EMAIL});
-    const mobile=/iPhone|iPad|Android/i.test(navigator.userAgent);
-    (mobile? auth.signInWithRedirect(p) : auth.signInWithPopup(p)).catch(e=>setSync('erro no login: '+(e.code||'')));
-  };
+  document.getElementById('login-form').onsubmit=e=>{ e.preventDefault();
+    const msg=document.getElementById('gate-msg'); msg.textContent='Entrando…';
+    auth.signInWithEmailAndPassword(document.getElementById('login-email').value.trim(), document.getElementById('login-senha').value)
+      .catch(x=>{ msg.textContent = /wrong-password|invalid-credential|user-not-found|invalid-login/.test(x.code||'') ? 'E-mail ou senha errados.' : 'Não entrou ('+(x.code||'erro')+').'; });
+    return false; };
 }
 let connected=false;
 function connect(){
