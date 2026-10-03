@@ -31,6 +31,10 @@
   --bad:#F07A72; --bad-soft:#3D1D1C; --warn:#F0AE52; --warn-soft:#3A2A12; --ok:#6CCB93; --ok-soft:#17301F;
   --amei:#D49AE6; --amei-soft:#35223D; color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+img{max-width:100%}
+:root{padding-top:env(safe-area-inset-top,0px)}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
 .wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:14px 110px}
 h1{font-family:var(--display);font-weight:800;font-size:22px;margin:0;letter-spacing:-.01em}
@@ -131,7 +135,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   <h3 style="text-align:center">Caixa da Laise</h3><p class="note" id="gate-msg" style="margin:0;text-align:center">Entre para ver suas contas.</p>
   <label for="login-email">E-mail<input id="login-email" type="email" autocomplete="username" value="laisesilvabarros@gmail.com" required></label>
   <label for="login-senha">Senha<input id="login-senha" type="password" autocomplete="current-password" required></label>
-  <button class="btn primary" id="login" type="submit" style="padding:12px 20px">Entrar</button></form></div>
+  <button class="btn primary" id="login" type="submit" style="padding:12px 20px">Entrar</button>
+  <button class="linkbtn meta" id="esqueci" type="button" style="justify-self:center">Esqueci minha senha</button></form></div>
 <div id="sheet-root"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -245,7 +250,7 @@ function render(){
 
 function renderContas(){
   const mk = ui.mes;
-  if(!mk) return `<div class="empty" style="margin-top:12px"><strong>Suas contas aparecem aqui</strong>Cada mês mostra o que vence, o que está atrasado e quanto falta pagar. ${db?'Os dados estão carregando.':'Abra esta página no claude.ai para ver seus dados.'}</div>`;
+  if(!mk) return `<div class="empty" style="margin-top:12px"><strong>Suas contas aparecem aqui</strong>Cada mês mostra o que vence, o que está atrasado e quanto falta pagar. ${db?'Ainda não há dados aqui. Na primeira vez, vá na aba <b>Saldos</b>, desça até o fim e toque em <b>Importar dados</b>.':'Entrando…'}</div>`;
   const m = store.meses[mk], t = monthTotals(mk), cs = (m.contas||[]).map((c,i)=>({...c,_i:i}));
   const pctPago = t.total? t.pago/t.total*100 : 0;
   const late = cs.filter(c=>isLate(c,mk)).sort((a,b)=>(a.dia||0)-(b.dia||0));
@@ -506,8 +511,11 @@ function start(){
   document.getElementById('login-form').onsubmit=e=>{ e.preventDefault();
     const msg=document.getElementById('gate-msg'); msg.textContent='Entrando…';
     auth.signInWithEmailAndPassword(document.getElementById('login-email').value.trim(), document.getElementById('login-senha').value)
-      .catch(x=>{ msg.textContent = /wrong-password|invalid-credential|user-not-found|invalid-login/.test(x.code||'') ? 'E-mail ou senha errados.' : 'Não entrou ('+(x.code||'erro')+').'; });
+      .catch(x=>{ msg.textContent = /wrong-password|invalid-credential|user-not-found|invalid-login/.test(x.code||'') ? 'E-mail ou senha errados. Se esqueceu, toque em "Esqueci minha senha".' : 'Não entrou ('+(x.code||'erro')+').'; });
     return false; };
+  document.getElementById('esqueci').onclick=()=>{ const msg=document.getElementById('gate-msg'), em=document.getElementById('login-email').value.trim();
+    auth.sendPasswordResetEmail(em).then(()=>{ msg.textContent='Mandei um e-mail para '+em+' com o link para criar uma senha nova (veja também o Spam).'; })
+      .catch(x=>{ msg.textContent='Não consegui mandar o e-mail ('+(x.code||'erro')+').'; }); };
 }
 let connected=false;
 function connect(){
