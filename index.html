@@ -339,8 +339,21 @@ function renderResumo(){
   const cats={}; ws.forEach(w=>Object.entries(w.categorias||{}).forEach(([k,v])=>cats[k]=(cats[k]||0)+(+v||0)));
   const cl=Object.entries(cats).sort((a,b)=>b[1]-a[1]), max=Math.max(1,...cl.map(x=>x[1]));
   const line=(t,v,extra='',st='')=>`<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><span>${t}${extra}</span><b style="font-family:var(--display);font-size:18px;${st}">${brl2(v)}</b></div>`;
-  if(!ws.length) return `<div class="empty" style="margin-top:14px"><strong>Ainda não há semanas em ${monthName(mk)}</strong>Quando você mandar os extratos, eu separo o que é da Amei e o que é seu, e o resumo aparece aqui.</div>`;
-  return `<section class="hero"><div class="eyebrow">Amei Semijoias em ${monthName(mk).toLowerCase()}</div>
+  const L=(store.meses[mk]||{}).livre;
+  let livre='';
+  if(L){
+    const gasto=store.semanas.filter(w=>String(w.inicio||'')>=L.desde && String(w.inicio||'')<=L.ate).reduce((a,w)=>a+(+w.gastoLivre||0),0);
+    const emerg=store.semanas.filter(w=>String(w.inicio||'')>=L.desde && String(w.inicio||'')<=L.ate).reduce((a,w)=>a+(+w.emergencias||0),0);
+    const resta=(+L.valor||0)-gasto, fim=parseISO(L.ate), dias=Math.max(1,Math.round((fim-today)/864e5)+1);
+    const pct=Math.max(0,Math.min(100,gasto/(+L.valor||1)*100));
+    livre=`<section class="hero" style="border-color:var(--gold)"><div class="eyebrow">Seu dinheiro livre até ${fmtDate(L.ate)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><b style="font-family:var(--display);font-size:34px;${resta<0?'color:var(--bad)':''}">${brl2(resta)}</b><span class="meta">de ${brl2(L.valor)}</span></div>
+      <div class="bar"><i style="width:${pct}%;background:${resta<0?'var(--bad)':'var(--gold)'}"></i></div>
+      <div class="split"><span>Já gastou <b>${brl2(gasto)}</b></span><span>${resta>=0?`Dá <b>${brl2(resta/dias)}</b> por dia nos próximos ${dias} dias`:`Passou <b>${brl2(-resta)}</b> do limite`}</span></div>
+      <div class="note" style="margin:0">${esc(L.regra||'')}${emerg?` Emergências fora do limite: ${brl2(emerg)}.`:''}</div></section>`;
+  }
+  if(!ws.length) return livre+`<div class="empty" style="margin-top:14px"><strong>Ainda não há semanas em ${monthName(mk)}</strong>Quando você mandar os extratos, eu separo o que é da Amei e o que é seu, e o resumo aparece aqui.</div>`;
+  return livre+`<section class="hero"><div class="eyebrow">Amei Semijoias em ${monthName(mk).toLowerCase()}</div>
       ${line('Entrou',entrou)}${line('A Amei gastou',ameiGastou)}
       <div style="border-top:1px solid var(--line);padding-top:10px">${line('<b>Lucro da Amei</b>',lucro,'<div class="meta">ainda sem descontar as peças do fornecedor</div>',`color:${lucro>=0?'var(--ok)':'var(--bad)'}`)}</div></section>
     <section class="hero"><div class="eyebrow">Você (pessoal)</div>
