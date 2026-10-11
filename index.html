@@ -121,7 +121,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 </style>
 
 <div class="wrap">
-  <div class="top"><h1>Caixa da Laise</h1><small id="sync">conectando…</small></div>
+  <div class="top"><h1>Caixa da Laise</h1><span style="display:flex;align-items:baseline;gap:10px"><small id="sync">conectando…</small><button id="atualizar" class="linkbtn" style="font-size:13px;font-weight:700">↻ Atualizar</button></span></div>
   <nav class="months" id="months" aria-label="Mês"></nav>
   <main id="view"></main>
 </div>
@@ -542,7 +542,7 @@ function connect(){
   try{ db.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(_){}
   setSync('carregando…');
   const err = e => setSync('erro ao carregar ('+(e&&e.code||'?')+')');
-  db.collection('meses').onSnapshot(s=>{ const o={}; s.docs.forEach(d=>{ o[d.id]=JSON.parse(JSON.stringify(d.data())); if(!o[d.id].contas) o[d.id].contas=[]; }); store.meses=o; setSync(s.metadata.fromCache?'offline (salvo no aparelho)':'atualizado'); if(!s.metadata.fromCache) aplicarFixas(); if(!document.getElementById('sheet-form')) render(); }, err);
+  db.collection('meses').onSnapshot(s=>{ const o={}; s.docs.forEach(d=>{ o[d.id]=JSON.parse(JSON.stringify(d.data())); if(!o[d.id].contas) o[d.id].contas=[]; }); store.meses=o; setSync(s.metadata.fromCache?'offline (salvo no aparelho)':'atualizado'); aplicarFixas(); if(!document.getElementById('sheet-form')) render(); }, err);
   db.collection('semanas').onSnapshot(s=>{ store.semanas=s.docs.map(d=>({id:d.id, ...JSON.parse(JSON.stringify(d.data()))})); if(!document.getElementById('sheet-form')) render(); }, err);
   db.collection('saldos_hist').onSnapshot(q=>{ store.hist=q.docs.map(d=>({id:d.id,...JSON.parse(JSON.stringify(d.data()))})); if(ui.tab==='saldos'&&!document.getElementById('sheet-form')) render(); }, err);
   db.doc('saldos/atual').onSnapshot(d=>{ store.saldos=d.exists?JSON.parse(JSON.stringify(d.data())):null; if(!document.getElementById('sheet-form')) render(); }, err);
@@ -558,6 +558,8 @@ document.addEventListener('change', async e=>{
     setSync(n+' registros importados');
   }catch(x){ setSync('não importou: '+(x.message||x)); }
 });
+/* Atualizar: baixa a versão mais nova do app e dos dados */
+document.getElementById('atualizar').onclick=()=>{ setSync('atualizando…'); location.replace(location.pathname+'?v='+Date.now()); };
 start();</script>
 
 </body></html>
