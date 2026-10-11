@@ -103,7 +103,7 @@ h1{font-family:var(--display);font-weight:800;font-size:22px;margin:0;letter-spa
 .note{font-size:13px;color:var(--muted);margin-top:10px}
 .pct{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
-.tabs div{display:grid;grid-template-columns:repeat(4,1fr);width:100%;max-width:560px}
+.tabs div{display:grid;grid-template-columns:repeat(5,1fr);width:100%;max-width:560px}
 .tab{background:none;border:0;padding:12px 4px 14px;font:700 13px var(--body);color:var(--muted);cursor:pointer;border-top:3px solid transparent}
 .tab[aria-selected="true"]{color:var(--fg);border-top-color:var(--gold)}
 .sheet-bg{position:fixed;inset:0;background:rgba(10,6,14,.45);z-index:10;display:flex;align-items:flex-end;justify-content:center}
@@ -127,6 +127,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 </div>
 <nav class="tabs" role="tablist"><div>
   <button class="tab" role="tab" id="tab-contas" data-tab="contas">Contas</button>
+  <button class="tab" role="tab" id="tab-resumo" data-tab="resumo">Resumo</button>
   <button class="tab" role="tab" id="tab-revs" data-tab="revs">Entradas</button>
   <button class="tab" role="tab" id="tab-meta" data-tab="meta">Metas</button>
   <button class="tab" role="tab" id="tab-saldos" data-tab="saldos">Saldos</button>
@@ -262,6 +263,7 @@ function render(){
   const v = document.getElementById('view');
   if(ui.tab==='contas') v.innerHTML = renderContas();
   else if(ui.tab==='revs') v.innerHTML = renderEntradas();
+  else if(ui.tab==='resumo') v.innerHTML = renderResumo();
   else if(ui.tab==='saldos') v.innerHTML = renderSaldos();
   else v.innerHTML = renderMeta();
 }
@@ -323,6 +325,33 @@ function renderEntradas(){
       ${!rs.length&&!+w.outros?'<span class="meta">Nenhuma entrada na Amei nesta semana.</span>':''}
       ${w.observacao?`<div class="note" style="margin:0">${esc(w.observacao)}</div>`:''}</div></section>`;
   }).join('');
+}
+
+/* Resumo: o que entrou, quanto a Amei gastou e lucrou, quanto você gastou e quanto passou do previsto.
+   Os números vêm das semanas (gastosAmei, gastosPessoal, pessoalPrevisto, retirado, categorias). */
+function renderResumo(){
+  const mk=ui.mes; if(!mk) return `<div class="empty" style="margin-top:12px"><strong>O resumo aparece aqui</strong>Quando as contas carregarem.</div>`;
+  const ws=store.semanas.filter(w=>String(w.inicio||'').slice(0,7)===mk).sort((a,b)=>String(a.inicio).localeCompare(String(b.inicio)));
+  const s=f=>ws.reduce((a,w)=>a+(+f(w)||0),0);
+  const entrou=s(w=>w.totalAmei), ameiGastou=s(w=>w.gastosAmei), lucro=entrou-ameiGastou;
+  const pes=s(w=>w.gastosPessoal), prev=s(w=>w.pessoalPrevisto), fora=Math.max(0,pes-prev), tirou=s(w=>w.retirado);
+  const mt=metaMes(mk), pl=mt?mt.pl:0, resta=pl-tirou;
+  const cats={}; ws.forEach(w=>Object.entries(w.categorias||{}).forEach(([k,v])=>cats[k]=(cats[k]||0)+(+v||0)));
+  const cl=Object.entries(cats).sort((a,b)=>b[1]-a[1]), max=Math.max(1,...cl.map(x=>x[1]));
+  const line=(t,v,extra='',st='')=>`<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><span>${t}${extra}</span><b style="font-family:var(--display);font-size:18px;${st}">${brl2(v)}</b></div>`;
+  if(!ws.length) return `<div class="empty" style="margin-top:14px"><strong>Ainda não há semanas em ${monthName(mk)}</strong>Quando você mandar os extratos, eu separo o que é da Amei e o que é seu, e o resumo aparece aqui.</div>`;
+  return `<section class="hero"><div class="eyebrow">Amei Semijoias em ${monthName(mk).toLowerCase()}</div>
+      ${line('Entrou',entrou)}${line('A Amei gastou',ameiGastou)}
+      <div style="border-top:1px solid var(--line);padding-top:10px">${line('<b>Lucro da Amei</b>',lucro,'<div class="meta">ainda sem descontar as peças do fornecedor</div>',`color:${lucro>=0?'var(--ok)':'var(--bad)'}`)}</div></section>
+    <section class="hero"><div class="eyebrow">Você (pessoal)</div>
+      ${line('Você gastou',pes)}${line('Contas que estavam no app',prev)}
+      <div style="border-top:1px solid var(--line);padding-top:10px">${line('<b>Gastou fora do previsto</b>',fora,'',fora>0?'color:var(--bad)':'color:var(--ok)')}</div></section>
+    <section class="hero"><div class="eyebrow">Pró-labore</div>
+      ${line('Pode tirar da Amei no mês',pl,'<div class="meta">contas pessoais menos o salário</div>')}${line('Já tirou',tirou)}
+      <div style="border-top:1px solid var(--line);padding-top:10px">${line(resta>=0?'<b>Ainda pode tirar</b>':'<b>Tirou a mais</b>',Math.abs(resta),'',resta>=0?'':'color:var(--bad)')}</div></section>
+    ${cl.length?`<section class="group"><h2><span>Onde foi o seu dinheiro</span><span>${brl(pes)}</span></h2><div class="card">${cl.map(([k,v])=>`<div style="display:grid;grid-template-columns:minmax(0,9rem) 1fr auto;gap:10px;align-items:center;font-size:13px"><span style="overflow-wrap:anywhere">${esc(k)}</span><div class="bar" style="height:8px"><i style="width:${v/max*100}%;background:${k==='Contas do mês'?'var(--gold)':'var(--amei)'}"></i></div><b>${brl(v)}</b></div>`).join('')}</div></section>`:''}
+    <section class="group"><h2><span>Semana a semana</span></h2><div class="cards">${ws.map(w=>`<div class="card" style="gap:4px;font-size:14px"><strong>${fmtDate(w.inicio)} a ${fmtDate(w.fim)}</strong>
+      <span class="meta">Entrou ${brl(+w.totalAmei||0)} · Amei gastou ${brl(+w.gastosAmei||0)} · Você gastou ${brl(+w.gastosPessoal||0)} · Fora do previsto ${brl(Math.max(0,(+w.gastosPessoal||0)-(+w.pessoalPrevisto||0)))}</span></div>`).join('')}</div></section>`;
 }
 
 function metaMes(mk){
