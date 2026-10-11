@@ -159,6 +159,24 @@ const shortMonth = k => monthName(k).slice(0,3) + (k.slice(0,4)!==String(today.g
 let store = { meses:{}, semanas:[], hist:[], config:{pct:0.6, fornecedor:8000, reserva:2000}, saldos:null };
 const CONTAS_BANCO=['Santander PF','Santander PJ','C6 PF','C6 PJ','XP','Nubank'];
 const CONTAS_PJ=['Santander PJ','C6 PJ'], CONTAS_PF=['Santander PF','C6 PF','XP','Nubank'];
+/* Contas fixas: entram sozinhas em todo mês (a partir de out/2026). Cada uma entra uma vez por mês;
+   se você apagar no app, ela não volta naquele mês. */
+const CONTAS_FIXAS=[
+  {id:'mei-sistema', nome:'Sistema do MEI', valor:299.99, dia:9, tipo:'amei'},
+  {id:'das-mei', nome:'DAS do MEI', valor:81, dia:20, tipo:'amei'},
+];
+const FIXAS_DESDE='2026-10';
+function aplicarFixas(){
+  if(!db) return;
+  for(const [mk,m] of Object.entries(store.meses)){
+    if(mk<FIXAS_DESDE) continue;
+    const feitas=m.fixas||[], novas=CONTAS_FIXAS.filter(f=>!feitas.includes(f.id));
+    if(!novas.length) continue;
+    for(const f of novas) if(!m.contas.some(c=>c.id===f.id)) m.contas.push({...f, atrasada:false, pago:false});
+    m.fixas=[...feitas, ...novas.map(f=>f.id)];
+    write('meses/'+mk, ()=>db.doc('meses/'+mk).update({contas:m.contas, fixas:m.fixas}));
+  }
+}
 let ui = { tab:'contas', mes:null, armed:null };
 try{ ui.tab = localStorage.getItem('caixa.tab') || 'contas'; }catch(e){}
 let db = null;
@@ -524,7 +542,7 @@ function connect(){
   try{ db.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(_){}
   setSync('carregando…');
   const err = e => setSync('erro ao carregar ('+(e&&e.code||'?')+')');
-  db.collection('meses').onSnapshot(s=>{ const o={}; s.docs.forEach(d=>{ o[d.id]=JSON.parse(JSON.stringify(d.data())); if(!o[d.id].contas) o[d.id].contas=[]; }); store.meses=o; setSync(s.metadata.fromCache?'offline (salvo no aparelho)':'atualizado'); if(!document.getElementById('sheet-form')) render(); }, err);
+  db.collection('meses').onSnapshot(s=>{ const o={}; s.docs.forEach(d=>{ o[d.id]=JSON.parse(JSON.stringify(d.data())); if(!o[d.id].contas) o[d.id].contas=[]; }); store.meses=o; setSync(s.metadata.fromCache?'offline (salvo no aparelho)':'atualizado'); if(!s.metadata.fromCache) aplicarFixas(); if(!document.getElementById('sheet-form')) render(); }, err);
   db.collection('semanas').onSnapshot(s=>{ store.semanas=s.docs.map(d=>({id:d.id, ...JSON.parse(JSON.stringify(d.data()))})); if(!document.getElementById('sheet-form')) render(); }, err);
   db.collection('saldos_hist').onSnapshot(q=>{ store.hist=q.docs.map(d=>({id:d.id,...JSON.parse(JSON.stringify(d.data()))})); if(ui.tab==='saldos'&&!document.getElementById('sheet-form')) render(); }, err);
   db.doc('saldos/atual').onSnapshot(d=>{ store.saldos=d.exists?JSON.parse(JSON.stringify(d.data())):null; if(!document.getElementById('sheet-form')) render(); }, err);
